@@ -12,6 +12,11 @@ abstract class AbstractExporter implements ExporterInterface
     protected $grid;
 
     /**
+     * @var int
+     */
+    protected $page;
+
+    /**
      * Create a new exporter instance.
      *
      * @param $grid
@@ -44,17 +49,19 @@ abstract class AbstractExporter implements ExporterInterface
      */
     public function getTable()
     {
-        return $this->grid->model()->eloquent()->getTable();
+        return $this->grid->model()->getOriginalModel()->getTable();
     }
 
     /**
      * Get data with export query.
      *
-     * @return array
+     * @param bool $toArray
+     *
+     * @return array|\Illuminate\Support\Collection|mixed
      */
-    public function getData()
+    public function getData($toArray = true)
     {
-        return $this->grid->getFilter()->execute();
+        return $this->grid->getFilter()->execute($toArray);
     }
 
     /**
@@ -65,7 +72,42 @@ abstract class AbstractExporter implements ExporterInterface
      */
     public function chunk(callable $callback, $count = 100)
     {
+        $this->grid->applyQuery();
+
         return $this->grid->getFilter()->chunk($callback, $count);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection
+     */
+    public function getCollection()
+    {
+        return collect($this->getData());
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Eloquent\Model
+     */
+    public function getQuery()
+    {
+        $model = $this->grid->getFilter()->getModel();
+
+        $queryBuilder = $model->getQueryBuilder();
+
+        // Export data of giving page number.
+        if ($this->page) {
+            $keyName = $this->grid->getKeyName();
+            $perPage = request($model->getPerPageName(), $model->getPerPage());
+
+            $scope = (clone $queryBuilder)
+                ->select([$keyName])
+                ->setEagerLoads([])
+                ->forPage($this->page, $perPage)->get();
+            // If $querybuilder is a Model, it must be reassigned, unless it is a eloquent/query builder.
+            $queryBuilder = $queryBuilder->whereIn($keyName, $scope->pluck($keyName));
+        }
+
+        return $queryBuilder;
     }
 
     /**
@@ -85,6 +127,7 @@ abstract class AbstractExporter implements ExporterInterface
 
         if ($scope == Grid\Exporter::SCOPE_CURRENT_PAGE) {
             $this->grid->model()->usePaginate(true);
+            $this->page = $args ?: 1;
         }
 
         if ($scope == Grid\Exporter::SCOPE_SELECTED_ROWS) {

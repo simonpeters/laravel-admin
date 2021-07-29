@@ -36,12 +36,13 @@ class Text extends Presenter
      *
      * @return array
      */
-    public function variables() : array
+    public function variables(): array
     {
         return [
             'placeholder' => $this->placeholder,
             'icon'        => $this->icon,
             'type'        => $this->type,
+            'group'       => $this->filter->group,
         ];
     }
 
@@ -52,7 +53,7 @@ class Text extends Presenter
      *
      * @return $this
      */
-    public function placeholder($placeholder = '') : self
+    public function placeholder($placeholder = ''): self
     {
         $this->placeholder = $placeholder;
 
@@ -62,7 +63,7 @@ class Text extends Presenter
     /**
      * @return Text
      */
-    public function url() : self
+    public function url(): self
     {
         return $this->inputmask(['alias' => 'url'], 'internet-explorer');
     }
@@ -70,7 +71,7 @@ class Text extends Presenter
     /**
      * @return Text
      */
-    public function email() : self
+    public function email(): self
     {
         return $this->inputmask(['alias' => 'email'], 'envelope');
     }
@@ -78,7 +79,7 @@ class Text extends Presenter
     /**
      * @return Text
      */
-    public function integer() : self
+    public function integer(): self
     {
         return $this->inputmask(['alias' => 'integer']);
     }
@@ -90,7 +91,7 @@ class Text extends Presenter
      *
      * @return Text
      */
-    public function decimal($options = []) : self
+    public function decimal($options = []): self
     {
         return $this->inputmask(array_merge($options, ['alias' => 'decimal']));
     }
@@ -102,7 +103,7 @@ class Text extends Presenter
      *
      * @return Text
      */
-    public function currency($options = []) : self
+    public function currency($options = []): self
     {
         return $this->inputmask(array_merge($options, [
             'alias'              => 'currency',
@@ -128,7 +129,7 @@ class Text extends Presenter
     /**
      * @return Text
      */
-    public function ip() : self
+    public function ip(): self
     {
         return $this->inputmask(['alias' => 'ip'], 'laptop');
     }
@@ -136,7 +137,7 @@ class Text extends Presenter
     /**
      * @return Text
      */
-    public function mac() : self
+    public function mac(): self
     {
         return $this->inputmask(['alias' => 'mac'], 'laptop');
     }
@@ -146,7 +147,7 @@ class Text extends Presenter
      *
      * @return Text
      */
-    public function mobile($mask = '19999999999') : self
+    public function mobile($mask = '19999999999'): self
     {
         return $this->inputmask(compact('mask'), 'phone');
     }
@@ -157,11 +158,15 @@ class Text extends Presenter
      *
      * @return $this
      */
-    public function inputmask($options = [], $icon = 'pencil') : self
+    public function inputmask($options = [], $icon = 'pencil'): self
     {
         $options = json_encode($options);
 
-        Admin::script("$('#filter-modal input.{$this->filter->getId()}').inputmask($options);");
+        $ids = (array) $this->filter->getId();
+
+        foreach ($ids as $id) {
+            Admin::script("$('#{$this->filter->getFilterBoxId()} input.{$id}').inputmask($options);");
+        }
 
         $this->icon = $icon;
 

@@ -4,6 +4,8 @@ namespace Encore\Admin\Form;
 
 use Encore\Admin\Admin;
 use Encore\Admin\Form;
+use Encore\Admin\Form\Field\Hidden;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -41,15 +43,11 @@ class Builder
     /**
      * @var array
      */
-    protected $options = [
-        'enableSubmit' => true,
-        'enableReset'  => true,
-    ];
+    protected $options = [];
 
     /**
      * Modes constants.
      */
-    const MODE_VIEW = 'view';
     const MODE_EDIT = 'edit';
     const MODE_CREATE = 'create';
 
@@ -69,6 +67,11 @@ class Builder
      * @var Tools
      */
     protected $tools;
+
+    /**
+     * @var Footer
+     */
+    protected $footer;
 
     /**
      * Width for label and field.
@@ -95,9 +98,16 @@ class Builder
     protected $title;
 
     /**
+     * @var string
+     */
+    protected $formClass;
+
+    /**
      * Builder constructor.
      *
      * @param Form $form
+     *
+     * @return void
      */
     public function __construct(Form $form)
     {
@@ -105,23 +115,40 @@ class Builder
 
         $this->fields = new Collection();
 
-        $this->setupTools();
+        $this->init();
     }
 
     /**
-     * Setup grid tools.
+     * Do initialize.
+     *
+     * @return void
      */
-    public function setupTools()
+    public function init()
     {
         $this->tools = new Tools($this);
+        $this->footer = new Footer($this);
+
+        $this->formClass = 'model-form-'.uniqid();
     }
 
     /**
+     * Get form tools instance.
+     *
      * @return Tools
      */
     public function getTools()
     {
         return $this->tools;
+    }
+
+    /**
+     * Get form footer instance.
+     *
+     * @return Footer
+     */
+    public function getFooter()
+    {
+        return $this->footer;
     }
 
     /**
@@ -137,21 +164,49 @@ class Builder
     }
 
     /**
+     * @return string
+     */
+    public function getMode(): string
+    {
+        return $this->mode;
+    }
+
+    /**
      * Returns builder is $mode.
      *
-     * @param $mode
+     * @param string $mode
      *
      * @return bool
      */
-    public function isMode($mode)
+    public function isMode($mode): bool
     {
-        return $this->mode == $mode;
+        return $this->mode === $mode;
+    }
+
+    /**
+     * Check if is creating resource.
+     *
+     * @return bool
+     */
+    public function isCreating(): bool
+    {
+        return $this->isMode(static::MODE_CREATE);
+    }
+
+    /**
+     * Check if is editing resource.
+     *
+     * @return bool
+     */
+    public function isEditing(): bool
+    {
+        return $this->isMode(static::MODE_EDIT);
     }
 
     /**
      * Set resource Id.
      *
-     * @param $id
+     * @param mixed $id
      *
      * @return void
      */
@@ -161,11 +216,23 @@ class Builder
     }
 
     /**
+     * Get Resource id.
+     *
+     * @return mixed
+     */
+    public function getResourceId()
+    {
+        return $this->id;
+    }
+
+    /**
+     * @param int|null $slice
+     *
      * @return string
      */
-    public function getResource($slice = null)
+    public function getResource(int $slice = null): string
     {
-        if ($this->mode == self::MODE_CREATE) {
+        if ($this->mode === self::MODE_CREATE) {
             return $this->form->resource(-1);
         }
         if ($slice !== null) {
@@ -181,7 +248,7 @@ class Builder
      *
      * @return $this
      */
-    public function setWidth($field = 8, $label = 2)
+    public function setWidth($field = 8, $label = 2): self
     {
         $this->width = [
             'label' => $label,
@@ -192,9 +259,21 @@ class Builder
     }
 
     /**
+     * Get label and field width.
+     *
+     * @return array
+     */
+    public function getWidth(): array
+    {
+        return $this->width;
+    }
+
+    /**
      * Set form action.
      *
      * @param string $action
+     *
+     * @return void
      */
     public function setAction($action)
     {
@@ -206,7 +285,7 @@ class Builder
      *
      * @return string
      */
-    public function getAction()
+    public function getAction(): string
     {
         if ($this->action) {
             return $this->action;
@@ -230,7 +309,7 @@ class Builder
      *
      * @return $this
      */
-    public function setView($view)
+    public function setView($view): self
     {
         $this->view = $view;
 
@@ -244,7 +323,7 @@ class Builder
      *
      * @return $this
      */
-    public function setTitle($title)
+    public function setTitle($title): self
     {
         $this->title = $title;
 
@@ -256,7 +335,7 @@ class Builder
      *
      * @return Collection
      */
-    public function fields()
+    public function fields(): Collection
     {
         return $this->fields;
     }
@@ -271,7 +350,7 @@ class Builder
     public function field($name)
     {
         return $this->fields()->first(function (Field $field) use ($name) {
-            return $field->column() == $name;
+            return $field->column() === $name;
         });
     }
 
@@ -280,7 +359,7 @@ class Builder
      *
      * @return bool
      */
-    public function hasRows()
+    public function hasRows(): bool
     {
         return !empty($this->form->rows);
     }
@@ -290,7 +369,7 @@ class Builder
      *
      * @return array
      */
-    public function getRows()
+    public function getRows(): array
     {
         return $this->form->rows;
     }
@@ -298,7 +377,7 @@ class Builder
     /**
      * @return array
      */
-    public function getHiddenFields()
+    public function getHiddenFields(): array
     {
         return $this->hiddenFields;
     }
@@ -339,8 +418,8 @@ class Builder
      */
     public function option($option, $value = null)
     {
-        if (func_num_args() == 1) {
-            return array_get($this->options, $option);
+        if (func_num_args() === 1) {
+            return Arr::get($this->options, $option);
         }
 
         $this->options[$option] = $value;
@@ -351,22 +430,18 @@ class Builder
     /**
      * @return string
      */
-    public function title()
+    public function title(): string
     {
         if ($this->title) {
             return $this->title;
         }
 
-        if ($this->mode == static::MODE_CREATE) {
+        if ($this->mode === static::MODE_CREATE) {
             return trans('admin.create');
         }
 
-        if ($this->mode == static::MODE_EDIT) {
+        if ($this->mode === static::MODE_EDIT) {
             return trans('admin.edit');
-        }
-
-        if ($this->mode == static::MODE_VIEW) {
-            return trans('admin.view');
         }
 
         return '';
@@ -377,10 +452,10 @@ class Builder
      *
      * @return bool
      */
-    public function hasFile()
+    public function hasFile(): bool
     {
         foreach ($this->fields() as $field) {
-            if ($field instanceof Field\File) {
+            if ($field instanceof Field\File || $field instanceof Field\MultipleFile) {
                 return true;
             }
         }
@@ -397,12 +472,12 @@ class Builder
     {
         $previous = URL::previous();
 
-        if (!$previous || $previous == URL::current()) {
+        if (!$previous || $previous === URL::current()) {
             return;
         }
 
         if (Str::contains($previous, url($this->getResource()))) {
-            $this->addHiddenField((new Form\Field\Hidden(static::PREVIOUS_URL_KEY))->value($previous));
+            $this->addHiddenField((new Hidden(static::PREVIOUS_URL_KEY))->value($previous));
         }
     }
 
@@ -413,21 +488,20 @@ class Builder
      *
      * @return string
      */
-    public function open($options = [])
+    public function open($options = []): string
     {
         $attributes = [];
 
-        if ($this->mode == self::MODE_EDIT) {
-            $this->addHiddenField((new Form\Field\Hidden('_method'))->value('PUT'));
+        if ($this->isMode(self::MODE_EDIT)) {
+            $this->addHiddenField((new Hidden('_method'))->value('PUT'));
         }
 
         $this->addRedirectUrlField();
 
         $attributes['action'] = $this->getAction();
-        $attributes['method'] = array_get($options, 'method', 'post');
+        $attributes['method'] = Arr::get($options, 'method', 'post');
+        $attributes['class'] = implode(' ', ['form-horizontal', $this->formClass]);
         $attributes['accept-charset'] = 'UTF-8';
-
-        $attributes['class'] = array_get($options, 'class');
 
         if ($this->hasFile()) {
             $attributes['enctype'] = 'multipart/form-data';
@@ -446,7 +520,7 @@ class Builder
      *
      * @return string
      */
-    public function close()
+    public function close(): string
     {
         $this->form = null;
         $this->fields = null;
@@ -455,51 +529,37 @@ class Builder
     }
 
     /**
-     * Submit button of form..
+     * @param string $message
      *
-     * @return string
+     * @return void
      */
-    public function submitButton()
+    public function confirm(string $message)
     {
-        if ($this->mode == self::MODE_VIEW) {
-            return '';
+        $trans = [
+            'confirm' => trans('admin.confirm'),
+            'cancel'  => trans('admin.cancel'),
+        ];
+
+        $script = <<<SCRIPT
+$('form.{$this->formClass} button[type=submit]').click(function (e) {
+    e.preventDefault();
+    var form = $(this).parents('form');
+    swal({
+        title: "$message",
+        type: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#DD6B55",
+        confirmButtonText: "{$trans['confirm']}",
+        cancelButtonText: "{$trans['cancel']}",
+    }).then(function (result) {
+        if (result.value) {
+          form.submit();
         }
+    });
+});
+SCRIPT;
 
-        if (!$this->options['enableSubmit']) {
-            return '';
-        }
-
-        if ($this->mode == self::MODE_EDIT) {
-            $text = trans('admin.save');
-        } else {
-            $text = trans('admin.submit');
-        }
-
-        return <<<EOT
-<div class="btn-group pull-right">
-    <button type="submit" class="btn btn-info pull-right" data-loading-text="<i class='fa fa-spinner fa-spin '></i> $text">$text</button>
-</div>
-EOT;
-    }
-
-    /**
-     * Reset button of form.
-     *
-     * @return string
-     */
-    public function resetButton()
-    {
-        if (!$this->options['enableReset']) {
-            return '';
-        }
-
-        $text = trans('admin.reset');
-
-        return <<<EOT
-<div class="btn-group pull-left">
-    <button type="reset" class="btn btn-warning">$text</button>
-</div>
-EOT;
+        Admin::script($script);
     }
 
     /**
@@ -509,34 +569,54 @@ EOT;
      */
     protected function removeReservedFields()
     {
-        if (!$this->isMode(static::MODE_CREATE)) {
+        if (!$this->isCreating()) {
             return;
         }
 
         $reservedColumns = [
-            $this->form->model()->getKeyName(),
             $this->form->model()->getCreatedAtColumn(),
             $this->form->model()->getUpdatedAtColumn(),
         ];
 
+        if ($this->form->model()->incrementing) {
+            $reservedColumns[] = $this->form->model()->getKeyName();
+        }
+
+        $this->form->getLayout()->removeReservedFields($reservedColumns);
+
         $this->fields = $this->fields()->reject(function (Field $field) use ($reservedColumns) {
-            return in_array($field->column(), $reservedColumns);
+            return in_array($field->column(), $reservedColumns, true);
         });
     }
 
     /**
-     * Render form.
+     * Render form header tools.
      *
      * @return string
      */
-    public function render()
+    public function renderTools(): string
     {
-        $this->removeReservedFields();
+        return $this->tools->render();
+    }
 
-        $tabObj = $this->form->getTab();
+    /**
+     * Render form footer.
+     *
+     * @return string
+     */
+    public function renderFooter(): string
+    {
+        return $this->footer->render();
+    }
 
-        if (!$tabObj->isEmpty()) {
-            $script = <<<'SCRIPT'
+    /**
+     * Add script for tab form.
+     *
+     * @return void
+     */
+    protected function addTabformScript()
+    {
+        $script = <<<'SCRIPT'
 
 var hash = document.location.hash;
 if (hash) {
@@ -559,31 +639,52 @@ if ($('.has-error').length) {
 }
 
 SCRIPT;
-            Admin::script($script);
+        Admin::script($script);
+    }
+
+    /**
+     * Add script for cascade.
+     *
+     * @return void
+     */
+    protected function addCascadeScript()
+    {
+        $script = <<<SCRIPT
+;(function () {
+    $('form.{$this->formClass}').submit(function (e) {
+        e.preventDefault();
+        $(this).find('div.cascade-group.hide :input').attr('disabled', true);
+    });
+})();
+SCRIPT;
+
+        Admin::script($script);
+    }
+
+    /**
+     * Render form.
+     *
+     * @return string
+     */
+    public function render(): string
+    {
+        $this->removeReservedFields();
+
+        $tabObj = $this->form->setTab();
+
+        if (!$tabObj->isEmpty()) {
+            $this->addTabformScript();
         }
+
+        $this->addCascadeScript();
 
         $data = [
             'form'   => $this,
             'tabObj' => $tabObj,
             'width'  => $this->width,
+            'layout' => $this->form->getLayout(),
         ];
 
         return view($this->view, $data)->render();
-    }
-
-    /**
-     * @return string
-     */
-    public function renderHeaderTools()
-    {
-        return $this->tools->render();
-    }
-
-    /**
-     * @return string
-     */
-    public function __toString()
-    {
-        return $this->render();
     }
 }

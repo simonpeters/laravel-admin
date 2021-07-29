@@ -2,10 +2,16 @@
 
 namespace Encore\Admin\Widgets;
 
+use Encore\Admin\Facades\Admin;
 use Illuminate\Contracts\Support\Renderable;
 
 class Tab extends Widget implements Renderable
 {
+    use ContainsForms;
+
+    const TYPE_CONTENT = 1;
+    const TYPE_LINK = 2;
+
     /**
      * @var string
      */
@@ -32,15 +38,43 @@ class Tab extends Widget implements Renderable
      *
      * @param string            $title
      * @param string|Renderable $content
+     * @param bool              $active
+     * @param string|null       $id
      *
      * @return $this
      */
-    public function add($title, $content, $active = false)
+    public function add($title, $content, $active = false, $id = null)
+    {
+        $this->data['tabs'][] = [
+            'id'      => $id ?: mt_rand(),
+            'title'   => $title,
+            'content' => $content,
+            'type'    => static::TYPE_CONTENT,
+        ];
+
+        if ($active) {
+            $this->data['active'] = count($this->data['tabs']) - 1;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Add a link on tab.
+     *
+     * @param string $title
+     * @param string $href
+     * @param bool   $active
+     *
+     * @return $this
+     */
+    public function addLink($title, $href, $active = false)
     {
         $this->data['tabs'][] = [
             'id'      => mt_rand(),
             'title'   => $title,
-            'content' => $content,
+            'href'    => $href,
+            'type'    => static::TYPE_LINK,
         ];
 
         if ($active) {
@@ -92,8 +126,32 @@ class Tab extends Widget implements Renderable
      */
     public function render()
     {
-        $variables = array_merge($this->data, ['attributes' => $this->formatAttributes()]);
+        $data = array_merge(
+            $this->data,
+            ['attributes' => $this->formatAttributes()]
+        );
 
-        return view($this->view, $variables)->render();
+        $this->setupScript();
+
+        return view($this->view, $data)->render();
+    }
+
+    /**
+     * Setup script.
+     */
+    protected function setupScript()
+    {
+        $script = <<<'SCRIPT'
+var hash = document.location.hash;
+if (hash) {
+    $('.nav-tabs a[href="' + hash + '"]').tab('show');
+}
+
+// Change hash for page-reload
+$('.nav-tabs a').on('shown.bs.tab', function (e) {
+    history.pushState(null,null, e.target.hash);
+});
+SCRIPT;
+        Admin::script($script);
     }
 }

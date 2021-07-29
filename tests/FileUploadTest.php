@@ -6,7 +6,7 @@ use Tests\Models\File as FileModel;
 
 class FileUploadTest extends TestCase
 {
-    public function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
 
@@ -16,7 +16,7 @@ class FileUploadTest extends TestCase
     public function testFileUploadPage()
     {
         $this->visit('admin/files/create')
-            ->see('Upload file')
+            ->see('Files')
             ->seeInElement('h3[class=box-title]', 'Create')
             ->seeElement('input[name=file1]')
             ->seeElement('input[name=file2]')
@@ -90,12 +90,12 @@ class FileUploadTest extends TestCase
             ->seeElement('input[name=file6]')
 //            ->seeInElement('a[href="/admin/files"]', 'List')
             ->seeInElement('button[type=reset]', 'Reset')
-            ->seeInElement('button[type=submit]', 'Save');
+            ->seeInElement('button[type=submit]', 'Submit');
 
         $this->attach(__DIR__.'/RolesTest.php', 'file3')
             ->attach(__DIR__.'/MenuTest.php', 'file4')
             ->attach(__DIR__.'/TestCase.php', 'file5')
-            ->press('Save');
+            ->press('Submit');
 
         $new = FileModel::first();
 
@@ -126,11 +126,11 @@ class FileUploadTest extends TestCase
             ->dontSeeInDatabase('test_files', ['id' => 1]);
 
         foreach (range(1, 6) as $index) {
-            $this->assertFileNotExists(public_path('uploads/'.$files['file'.$index]));
+            $this->assertFileDoesNotExist(public_path('uploads/'.$files['file'.$index]));
         }
 
         $this->visit('admin/files')
-            ->dontSeeInElement('td', 1);
+            ->seeInElement('td', 'svg');
     }
 
     public function testBatchDelete()
@@ -157,9 +157,7 @@ class FileUploadTest extends TestCase
         $this->assertEquals(FileModel::count(), 0);
 
         $this->visit('admin/files')
-            ->dontSeeInElement('td', 1)
-            ->dontSeeInElement('td', 2)
-            ->dontSeeInElement('td', 3);
+            ->seeInElement('td', 'svg');
 
         $this->assertEquals(iterator_count($fi), 0);
     }

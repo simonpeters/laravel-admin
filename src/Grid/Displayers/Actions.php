@@ -17,14 +17,11 @@ class Actions extends AbstractDisplayer
     protected $prepends = [];
 
     /**
-     * @var bool
+     * Default actions.
+     *
+     * @var array
      */
-    protected $allowEdit = true;
-
-    /**
-     * @var bool
-     */
-    protected $allowDelete = true;
+    protected $actions = ['view', 'edit', 'delete'];
 
     /**
      * @var string
@@ -32,9 +29,18 @@ class Actions extends AbstractDisplayer
     protected $resource;
 
     /**
-     * @var
+     * Disable all actions.
+     *
+     * @var bool
      */
-    protected $key;
+    protected $disableAll = false;
+
+    /**
+     * diy translate.
+     *
+     * @var array
+     */
+    protected $trans = [];
 
     /**
      * Append a action.
@@ -65,23 +71,73 @@ class Actions extends AbstractDisplayer
     }
 
     /**
+     * Get route key name of current row.
+     *
+     * @return mixed
+     */
+    public function getRouteKey()
+    {
+        return $this->row->{$this->row->getRouteKeyName()};
+    }
+
+    /**
+     * Disable view action.
+     *
+     * @return $this
+     */
+    public function disableView(bool $disable = true)
+    {
+        if ($disable) {
+            array_delete($this->actions, 'view');
+        } elseif (!in_array('view', $this->actions)) {
+            array_push($this->actions, 'view');
+        }
+
+        return $this;
+    }
+
+    /**
      * Disable delete.
      *
-     * @return void.
+     * @return $this.
      */
-    public function disableDelete()
+    public function disableDelete(bool $disable = true)
     {
-        $this->allowDelete = false;
+        if ($disable) {
+            array_delete($this->actions, 'delete');
+        } elseif (!in_array('delete', $this->actions)) {
+            array_push($this->actions, 'delete');
+        }
+
+        return $this;
     }
 
     /**
      * Disable edit.
      *
-     * @return void.
+     * @return $this.
      */
-    public function disableEdit()
+    public function disableEdit(bool $disable = true)
     {
-        $this->allowEdit = false;
+        if ($disable) {
+            array_delete($this->actions, 'edit');
+        } elseif (!in_array('edit', $this->actions)) {
+            array_push($this->actions, 'edit');
+        }
+
+        return $this;
+    }
+
+    /**
+     * Disable all actions.
+     *
+     * @return $this
+     */
+    public function disableAll()
+    {
+        $this->disableAll = true;
+
+        return $this;
     }
 
     /**
@@ -89,11 +145,13 @@ class Actions extends AbstractDisplayer
      *
      * @param $resource
      *
-     * @return void
+     * @return $this
      */
     public function setResource($resource)
     {
         $this->resource = $resource;
+
+        return $this;
     }
 
     /**
@@ -115,13 +173,15 @@ class Actions extends AbstractDisplayer
             $callback->call($this, $this);
         }
 
-        $actions = $this->prepends;
-        if ($this->allowEdit) {
-            array_push($actions, $this->editAction());
+        if ($this->disableAll) {
+            return '';
         }
 
-        if ($this->allowDelete) {
-            array_push($actions, $this->deleteAction());
+        $actions = $this->prepends;
+
+        foreach ($this->actions as $action) {
+            $method = 'render'.ucfirst($action);
+            array_push($actions, $this->{$method}());
         }
 
         $actions = array_merge($actions, $this->appends);
@@ -129,93 +189,115 @@ class Actions extends AbstractDisplayer
         return implode('', $actions);
     }
 
-    public function setKey($key)
-    {
-        $this->key = $key;
-
-        return $this;
-    }
-
-    public function getKey()
-    {
-        if ($this->key) {
-            return $this->key;
-        }
-
-        return parent::getKey();
-    }
-
     /**
-     * Built edit action.
+     * Render view action.
      *
      * @return string
      */
-    protected function editAction()
+    protected function renderView()
     {
         return <<<EOT
-<a href="{$this->getResource()}/{$this->getKey()}/edit">
+<a href="{$this->getResource()}/{$this->getRouteKey()}" class="{$this->grid->getGridRowName()}-view">
+    <i class="fa fa-eye"></i>
+</a>
+EOT;
+    }
+
+    /**
+     * Render edit action.
+     *
+     * @return string
+     */
+    protected function renderEdit()
+    {
+        return <<<EOT
+<a href="{$this->getResource()}/{$this->getRouteKey()}/edit" class="{$this->grid->getGridRowName()}-edit">
     <i class="fa fa-edit"></i>
 </a>
 EOT;
     }
 
     /**
-     * Built delete action.
+     * Render delete action.
      *
      * @return string
      */
-    protected function deleteAction()
+    protected function renderDelete()
     {
-        $deleteConfirm = trans('admin.delete_confirm');
-        $confirm = trans('admin.confirm');
-        $cancel = trans('admin.cancel');
+        $this->setupDeleteScript();
+
+        return <<<EOT
+<a href="javascript:void(0);" data-id="{$this->getKey()}" class="{$this->grid->getGridRowName()}-delete">
+    <i class="fa fa-trash"></i>
+</a>
+EOT;
+    }
+
+    protected function setupDeleteScript()
+    {
+        $trans = [
+            'delete_confirm' => trans('admin.delete_confirm'),
+            'confirm'        => trans('admin.confirm'),
+            'cancel'         => trans('admin.cancel'),
+        ];
+
+        $trans = array_merge($trans, $this->trans);
 
         $script = <<<SCRIPT
 
-$('.grid-row-delete').unbind('click').click(function() {
+$('.{$this->grid->getGridRowName()}-delete').unbind('click').click(function() {
 
     var id = $(this).data('id');
 
     swal({
-      title: "$deleteConfirm",
-      type: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#DD6B55",
-      confirmButtonText: "$confirm",
-      closeOnConfirm: false,
-      cancelButtonText: "$cancel"
-    },
-    function(){
-        $.ajax({
-            method: 'post',
-            url: '{$this->getResource()}/' + id,
-            data: {
-                _method:'delete',
-                _token:LA.token,
-            },
-            success: function (data) {
-                $.pjax.reload('#pjax-container');
+        title: "{$trans['delete_confirm']}",
+        type: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#DD6B55",
+        confirmButtonText: "{$trans['confirm']}",
+        showLoaderOnConfirm: true,
+        cancelButtonText: "{$trans['cancel']}",
+        preConfirm: function() {
+            return new Promise(function(resolve) {
+                $.ajax({
+                    method: 'post',
+                    url: '{$this->getResource()}/' + id,
+                    data: {
+                        _method:'delete',
+                        _token:LA.token,
+                    },
+                    success: function (data) {
+                        $.pjax.reload('#pjax-container');
 
-                if (typeof data === 'object') {
-                    if (data.status) {
-                        swal(data.message, '', 'success');
-                    } else {
-                        swal(data.message, '', 'error');
+                        resolve(data);
                     }
-                }
+                });
+            });
+        }
+    }).then(function(result) {
+        var data = result.value;
+        if (typeof data === 'object') {
+            if (data.status) {
+                swal(data.message, '', 'success');
+            } else {
+                swal(data.message, '', 'error');
             }
-        });
+        }
     });
 });
 
 SCRIPT;
 
         Admin::script($script);
+    }
 
-        return <<<EOT
-<a href="javascript:void(0);" data-id="{$this->getKey()}" class="grid-row-delete">
-    <i class="fa fa-trash"></i>
-</a>
-EOT;
+    /**
+     * diy delete translate.
+     *
+     * @param $tans
+     */
+    public function setTrans($tans)
+    {
+        $this->trans = $tans;
     }
 }
